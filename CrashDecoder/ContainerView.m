@@ -104,6 +104,7 @@
     NSString *uuidCMDInfo = [self runCommand:commandString];
     if (uuidCMDInfo) {
         NSString *uuid = [uuidCMDInfo substringWithRange:NSMakeRange(6, 36)];
+        uuid = [uuid stringByReplacingOccurrencesOfString:@"-" withString:@""];
         return uuid;
     }else{
         return nil;
@@ -116,8 +117,35 @@
     NSError *error;
     NSDictionary *dictInfo = [NSJSONSerialization JSONObjectWithData:jsonData options:NSJSONReadingMutableContainers error:&error];
     if (dictInfo) {
+        //第一行无uuid信息
         NSString *uuid = [dictInfo valueForKey:@"slice_uuid"];
         return uuid?[uuid uppercaseString]:nil;
+    }else{
+        //通过binary images段获取
+        NSString *wholeStr = [[NSString alloc] initWithContentsOfFile:crashFielPath];
+        NSArray *wholeAry = [wholeStr componentsSeparatedByString:@"\n"];
+        NSString *path = nil;
+        for (int i=0;i<wholeAry.count;i++){
+            NSString *tmpS = wholeAry[i];
+            if ([tmpS containsString:@"Path:"]) {
+                NSArray *pathComponets = [tmpS componentsSeparatedByString:@" "];
+                path = [pathComponets lastObject];
+                break;
+            }
+        }
+        NSArray *ary = [wholeStr componentsSeparatedByString:@"Binary Images:"];
+        if (ary.count == 2) {
+            NSArray *binaryAry = [ary[1] componentsSeparatedByString:@"\n"];
+            for (NSString *binaryStr in binaryAry) {
+                if ([binaryStr containsString:path]) {
+                    NSArray *resAry = [binaryStr componentsSeparatedByCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"<>"]];
+                    if (resAry.count == 3) {
+                        NSString *uuid = resAry[1];
+                        return uuid?[uuid uppercaseString]:nil;
+                    }
+                }
+            }
+        }
     }
 
     return nil;
